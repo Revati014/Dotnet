@@ -1,0 +1,45 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  outputFolder: 'publish_output'
+
+steps:
+
+- checkout: self
+
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build .NET Project'
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'
+    arguments: '--configuration $(buildConfiguration)'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Publish .NET Project'
+  inputs:
+    command: 'publish'
+    publishWebProjects: true
+    arguments: '--configuration $(buildConfiguration) --output $(outputFolder)'
+
+- script: |
+    cd $(outputFolder)
+    zip -r Zuora-To-X3.zip *
+  displayName: 'Create ZIP file'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(outputFolder)/Zuora-To-X3.zip'
+    artifactName: 'ZuoraApp'
+    publishLocation: 'Container'

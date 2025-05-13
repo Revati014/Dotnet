@@ -1,0 +1,6 @@
+@Zuora_To_X3_HostAddress = http://localhost:5199
+
+GET {{Zuora_To_X3_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
