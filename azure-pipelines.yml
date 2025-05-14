@@ -44,3 +44,6 @@ steps:
     pathToPublish: '$(outputFolder)/Zuora-To-X3.zip'
     artifactName: 'ZuoraApp'
     publishLocation: 'Container'
+
+
+    
