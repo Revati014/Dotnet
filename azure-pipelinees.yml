@@ -1,0 +1,16 @@
+resources:
+  webhooks:
+    - webhook: webhookTrigger     # This is an alias you choose
+      connection: webhook         # Must match the service connection name you created
+
+trigger: none                   # disable regular CI triggers
+
+pool:
+  name: SelfHosted              # your agent pool name
+  demands:
+    - Agent.Name -equals Agennt # your specific agent name
+
+steps:
+- script: |
+    echo "Webhook triggered!"
+    echo "Repository: ${{ parameters.webhookTrigger.repository.full_name }}"
