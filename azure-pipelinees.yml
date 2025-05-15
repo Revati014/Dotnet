@@ -1,6 +1,6 @@
 resources:
   webhooks:
-    - webhook: webhookTrigger     # This is an alias you choose
+    - webhook: webhookTrigger     # This is an alias bwejkfbewfbewfewfkeyou choose
       connection: webhook         # Must match the service connection name you created
 
 trigger: none                   # disable regular CI triggers
