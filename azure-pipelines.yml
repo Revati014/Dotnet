@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'SelfHosted'  # This assumes your agent pool name is 'SelfHosted fed fdfceverveef'
+  name: 'SelfHosted'  # This assumes your agent pool name is 'SelfHosted fed fsdcdscdscxdsvdsacdfceverveef'
 
 variables:
   buildConfiguration: 'Release'
