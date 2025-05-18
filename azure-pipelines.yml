@@ -3,8 +3,8 @@ trigger:
     include:
       - '*'
 
-pool:
-  name: 'keda-agents'  # Updated to your actual agent pool name
+
+  name: 'keda-agents'  # Updated to your actual agent pool nadcwcwecewme
 
 variables:
   buildConfiguration: 'Release'
