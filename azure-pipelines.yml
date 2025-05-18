@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - main
+      - '*'
 
 pool:
   name: 'keda-agents'  # Updated to your actual agent pool name
