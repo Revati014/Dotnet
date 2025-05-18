@@ -4,7 +4,7 @@ trigger:
       - '*'
 
 
-  name: 'keda-agents'  # Updated to your actual agent pool nadcwcwecefewfewwefewcdwewewcwecgweccwwme
+  name: 'keda-agents'  # Updated to your actual agent pcdsvewfewcool nadcwcwecefewfewwefewcdwewewcwecgweccwwme
 
 variables:
   buildConfiguration: 'Release'
