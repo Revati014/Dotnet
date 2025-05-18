@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'SelfHosted'  # This assumes your agent pool name is 'SelfHosted fed fsdcdscdscxdsvdsacdfceverveef'
+  name: 'keda-agents'  # Updated to your actual agent pool name
 
 variables:
   buildConfiguration: 'Release'
@@ -44,6 +44,3 @@ steps:
     pathToPublish: '$(outputFolder)/Zuora-To-X3.zip'
     artifactName: 'ZuoraApp'
     publishLocation: 'Container'
-
-
-    
