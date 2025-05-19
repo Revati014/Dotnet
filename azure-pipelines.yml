@@ -1,46 +1,150 @@
+#
+# Copyright (c) 2025 TomTom N.V. All rights reserved.
+#
+# This software is the proprietary copyright of TomTom N.V. and its subsidiaries and may be
+# used for internal evaluation purposes or commercial use strictly subject to separate
+# licensee agreement between you and TomTom. If you are the licensee, you are only permitted
+# to use this Software in accordance with the terms of your license agreement. If you are
+# not the licensee then you are not authorised to use this software in any manner and should
+# immediately return it to TomTom N.V.
+##############################################################################################
+
 trigger:
-  branches:
-    include:
-      - '*'
+  - '*'
 
+pr: none
 
-  name: 'keda-agents'  # Updated to your actual agent pcdsvewfewcool nadcwcwecefewfewwefewcdwewewcwecgweccwwme
+pool: 'az-weu-ubuntu-22.04-amd64-4cpu'
+
+parameters:
+    -   name: timeoutInMinutes
+        type: number
+        default: 60
+    -   name: pactsDirectory
+        default: $(Build.SourcesDirectory)/target/pacts
+    -   name: profiles
+        default: nds-development
+    -   name: workingDirectory
+        default: .
+    -   name: scanTrivyJar
+        type: boolean
+        default: True
+    -   name: scanTrivyPOM
+        type: boolean
+        default: False
+    -   name: veracodeScanFiles
+        default: ""
+    -   name: serviceName
+        type: string
+        default: nds-compiler-live-smartlayer
+    -   name: productName
+        type: string
+        default: delivery-umd
+
 
 variables:
-  buildConfiguration: 'Release'
-  outputFolder: 'publish_output'
+    -   group: autostream-service-principal
+    -   group: artifactory-authentication
+    -   template: templates/components/variables.yaml@templates
+    -   template: templates/mvn/variables.yaml@templates
 
-steps:
+resources:
+   repositories:
+     - repository: templates
+       type: github
+       name: tomtom-internal/ad-delivery-azure-devops-templates
+       endpoint: tomtom-internal
+   containers:
+       -   container: mavenContainer
+           image: artifactory.tomtomgroup.com/autostream-docker-build/tomtom/autostreamservice/maven-java-21:latest
+           endpoint: artifactory-del-streaming
+           options: -v /tmp:/tmp
 
-- checkout: self
+       -   container: trivyContainer
+           image: artifactory.tomtomgroup.com/autostream-docker-build/tomtom/autostreamservice/trivy:latest
+           endpoint: artifactory-del-streaming
+           options: -v /tmp:/tmp
 
-- task: UseDotNet@2
-  inputs:
-    packageType: 'sdk'
-    version: '8.0.x'
+       -   container: blackDuckContainer
+           image: artifactory.tomtomgroup.com/autostream-docker-build/tomtom/autostreamservice/black-duck:latest
+           endpoint: artifactory-del-streaming
+           env:
+               BDTOOLS_ENVIRONMENT: prod
 
-- task: DotNetCoreCLI@2
-  displayName: 'Build .NET Project'
-  inputs:
-    command: 'build'
-    projects: '**/*.csproj'
-    arguments: '--configuration $(buildConfiguration)'
+jobs:
+    -   job: Build
+        timeoutInMinutes: ${{ parameters.timeoutInMinutes }}
+        workspace:
+            clean: all
+        steps:
+            # Version
+            -   template: templates/git/steps/setup-git.yaml@templates
+            -   template: templates/mvn/steps/setup-settings-xml.yaml@templates
 
-- task: DotNetCoreCLI@2
-  displayName: 'Publish .NET Project'
-  inputs:
-    command: 'publish'
-    publishWebProjects: true
-    arguments: '--configuration $(buildConfiguration) --output $(outputFolder)'
+            # Manually set the value of GitVersion.SemVer
+            -   script: |
+                    FULL_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+                    echo "GitVersion.SemVer: $FULL_VERSION"
+                    echo "##vso[task.setvariable variable=GitVersion.SemVer]$FULL_VERSION"
+                displayName: 'Extract and Set FULL_VERSION as GitVersion.SemVer manually'
 
-- script: |
-    cd $(outputFolder)
-    zip -r Zuora-To-X3.zip *
-  displayName: 'Create ZIP file'
-  workingDirectory: '$(Build.SourcesDirectory)'
+            # Build
+            -   template: templates/mvn/steps/setup-maven-cache.yaml@templates
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    pathToPublish: '$(outputFolder)/Zuora-To-X3.zip'
-    artifactName: 'ZuoraApp'
-    publishLocation: 'Container'
+            # trivy SCA (POM)
+            -   ${{ if eq(parameters.scanTrivyPOM, True) }}:
+                    -   template: templates/trivy/steps/run-scan-sca.yaml@templates
+                        parameters:
+                            scanType: POM
+                            workingDirectory: ${{ parameters.workingDirectory }}
+
+            -   template: templates/mvn/steps/build-maven-artifacts.yaml@templates
+                parameters:
+                    profiles: ${{ parameters.profiles }}
+                    workingDirectory: ${{ parameters.workingDirectory }}
+
+            # trivy SCA (jar)
+            -   ${{ if eq(parameters.scanTrivyJar, True) }}:
+                    -   template: templates/trivy/steps/run-scan-sca.yaml@templates
+                        parameters:
+                            scanType: jar
+                            workingDirectory: ${{ parameters.workingDirectory }}
+
+            # gitleaks
+            -   template: templates/gitleaks/steps/run-gitleaks-dir.yaml@templates
+
+            # Veracode
+            -   template: templates/veracode/steps/run-veracode-scan.yaml@templates
+                parameters:
+                    isMain: ${{ variables.IS_MAIN }}
+                    serviceName: ${{ parameters.serviceName }}
+                    serviceVersion: $(GitVersion.SemVer)
+                    productName: ${{ parameters.productName }}
+                    veracodeScanFiles: $(Build.SourcesDirectory)/${{ parameters.serviceName }}/target/${{ parameters.serviceName }}-$(GitVersion.SemVer)-exec.jar ${{ parameters.veracodeScanFiles }}
+
+            # Black Duck
+            -   template: templates/black-duck/steps/configure-and-run-black-duck-scan.yaml@templates
+                parameters:
+                    isMain: ${{ variables.IS_MAIN }}
+                    version: $(GitVersion.SemVer)
+
+    -   job: Unit_Test
+        steps:
+            -   template: templates/git/steps/setup-git.yaml@templates
+            -   template: templates/mvn/steps/setup-settings-xml.yaml@templates
+            -   template: templates/mvn/steps/setup-maven-cache.yaml@templates
+
+            -   bash: mvn clean install -DskipTests -Pnds-report
+                workingDirectory: ${{ parameters.workingDirectory }}
+                displayName: Build JVM without Profiles
+                target: mavenContainer
+
+            -   template: templates/mvn/steps/unit-test-with-sonar.yaml@templates
+                parameters:
+                    profiles: "nds-report"
+                    workingDirectory: ${{ parameters.workingDirectory }}
+                    isMain: ${{ variables.IS_MAIN }}
+                    pactsDirectory: ${{ parameters.pactsDirectory }}
+
+
+
